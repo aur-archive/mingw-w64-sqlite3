@@ -1,0 +1,49 @@
+# Contributor: napa3um <napa3um@gmail.com>
+# Contributor: Filip Brcic <brcha@gna.org>
+
+pkgname=mingw-w64-sqlite3
+_amalgamationver=3080403
+pkgver=3.8.4.3
+pkgrel=1
+pkgdesc="A C library that implements an SQL database engine (mingw-w64)"
+arch=(any)
+groups=(mingw-w64)
+depends=(mingw-w64-crt mingw-w64-pdcurses mingw-w64-readline)
+makedepends=(mingw-w64-gcc tcl)
+options=(!buildflags !strip staticlibs !emptydirs)
+license=("custom:Public Domain")
+url="http://www.sqlite.org"
+source=("http://www.sqlite.org/2014/sqlite-autoconf-$_amalgamationver.tar.gz")
+sha256sums=("e0e995e23a324a5d6ae95d8a836240382a4d7475d09707fc469c8cafcbd48d65")
+
+_architectures="i686-w64-mingw32 x86_64-w64-mingw32"
+
+build() {
+  cd "${srcdir}/sqlite-autoconf-${_amalgamationver}"
+  for _arch in ${_architectures}; do
+    mkdir -p build-${_arch} && pushd build-${_arch}
+    unset LDFLAGS
+    export config_TARGET_EXEEXT=.exe
+    export CFLAGS="-O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions --param=ssp-buffer-size=4 -DSQLITE_ENABLE_COLUMN_METADATA=1 -DSQLITE_DISABLE_DIRSYNC=1 -DSQLITE_ENABLE_FTS3=3 -DSQLITE_ENABLE_RTREE=1 -fno-strict-aliasing"
+    ../configure --prefix=/usr/${_arch} \
+      --host=${_arch} \
+      --target=${_arch} \
+      --build=${CHOST} \
+      --enable-threadsafe
+    make
+    popd
+  done
+}
+
+package() {
+  cd "${srcdir}/sqlite-autoconf-${_amalgamationver}"
+  for _arch in ${_architectures}; do
+    pushd build-${_arch}
+    make DESTDIR="${pkgdir}" install
+    find "${pkgdir}/usr/${_arch}" -name "*.exe" -o -name "*.bat" -o -name "*.def" -o -name "*.exp" | xargs -rtl1 rm
+    find "${pkgdir}/usr/${_arch}" -name "*.dll" | xargs -rtl1 ${_arch}-strip --strip-unneeded
+    find "${pkgdir}/usr/${_arch}" -name "*.a" -o -name "*.dll" | xargs -rtl1 ${_arch}-strip -g
+    rm -rf "${pkgdir}/usr/${_arch}/share"
+    popd
+  done
+}
